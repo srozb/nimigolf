@@ -9,6 +9,9 @@ import nimigolf/trajectory
 import nimigolf/converters
 
 type
+  bncType = enum
+    bHor, bVer, bDiagSl, bDiagBSl
+
   Ball = ref object of Obj
     id, shots: int
     justBounced: bool
@@ -63,8 +66,11 @@ proc shouldScore(self: Ball): bool {.inline.} =
   return (abs(self.center[0] - holePos.x) + abs(self.center[1] - holePos.y)) < 3
 
 method center(self: Ball): (int, int) {.inline.} =
-  result[0] = self.pos.x.toInt + self.hitbox.x
-  result[1] = self.pos.y.toInt + self.hitbox.y
+  result = (self.pos.x.toInt + self.hitbox.x, self.pos.y.toInt + self.hitbox.y)
+
+method center(self: Ball): Vec2 {.inline.} =
+  result.x = self.pos.x.toInt + self.hitbox.x
+  result.y = self.pos.y.toInt + self.hitbox.y
 
 method centerTile(self: Ball): (Pint, Pint) {.inline.} =
   let coords = self.center()
@@ -75,40 +81,40 @@ method tilePos(self: Ball): (Pint, Pint) {.inline.} =
   let coords = self.center()
   result = (coords[0] mod TS, coords[1] mod TS)
 
+proc bounce(self: Ball, bounces: var seq[bncType]) =
+  while bounces.len > 0:
+    self.justBounced = true
+    case bounces.pop
+    of bHor:
+      self.vel.y *= -BOUNCY
+    of bVer:
+      self.vel.x *= -BOUNCY
+    of bDiagSl:
+      (self.vel.x, self.vel.y) = (self.vel.y * -BOUNCY, self.vel.x * -BOUNCY) 
+    of bDiagBSl:
+      (self.vel.x, self.vel.y) = (self.vel.y * BOUNCY, self.vel.x * BOUNCY)
+
 proc bounceIfCollision(self: Ball): bool =
   if self.justBounced: # to be sure, not bounced twice
-    self.justBounced = false
     return false
   let
     ballTile = self.centerTile()
     curTile = mget(ballTile[0], ballTile[1])
     ballTilePos = self.tilePos()
+  var bounces = newSeq[bncType]()
   if curTile in HBOUNDS:
-    self.vel.y *= -BOUNCY
-    return true
+    bounces.add(bHor)
   elif curTile in VBOUNDS:
-    self.vel.x *= -BOUNCY
-    return true
+    bounces.add(bVer)
   elif curTile in DBOUNDS:
-    let tmpVel = self.vel.y * -BOUNCY
-    self.vel.y = self.vel.x * -BOUNCY
-    self.vel.x = tmpVel
-    return true
+    bounces.add(bDiagSl)
   elif curTile in BDBOUNDS:
-    let tmpVel = self.vel.y * BOUNCY
-    self.vel.y = self.vel.x * BOUNCY
-    self.vel.x = tmpVel
-    return true
+    bounces.add(bDiagBSl)
   elif curTile in HDBOUNDS and ballTilePos[0] + ballTilePos[1] - TS < 3:
-    let tmpVel = self.vel.y * -BOUNCY
-    self.vel.y = self.vel.x * -BOUNCY
-    self.vel.x = tmpVel
-    return true
+    bounces.add(bDiagSl)
   elif curTile in HBDBOUNDS and abs(ballTilePos[0] - ballTilePos[1]) < 3:
-    let tmpVel = self.vel.y * BOUNCY
-    self.vel.y = self.vel.x * BOUNCY
-    self.vel.x = tmpVel
-    return true
+    bounces.add(bDiagBSl)
+  self.bounce(bounces)
 
 proc turnNearHole(self: Ball) =
   let holeDist = self.objDistance(holePos)
@@ -213,10 +219,14 @@ proc gameUpdate(dt: float32) =
     if objDistance(currentBall(), m) < 5:
       tl.visible = true
       hideMouse()
-      tl.x1 = center(currentBall())[0]
-      tl.y1 = center(currentBall())[1]
-    tl.x2 = m[0]  # TODO: scale
-    tl.y2 = m[1]
+      tl.pos.x = center(currentBall())[0]
+      tl.pos.y = center(currentBall())[1]
+      # tl.x1 = center(currentBall())[0]
+      # tl.y1 = center(currentBall())[1]
+    tl.frc.x = m[0]
+    tl.frc.y = m[1]
+    # tl.x2 = m[0]  # TODO: scale
+    # tl.y2 = m[1]
   else:
     if tl.visible == true:
       tl.visible = false
