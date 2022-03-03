@@ -63,14 +63,7 @@ proc stop(self: Ball) =
   self.vel.y = 0
 
 proc shouldScore(self: Ball): bool {.inline.} =
-  return (abs(self.center[0] - holePos.x) + abs(self.center[1] - holePos.y)) < 3
-
-method center(self: Ball): (int, int) {.inline.} =
-  result = (self.pos.x.toInt + self.hitbox.x, self.pos.y.toInt + self.hitbox.y)
-
-method center(self: Ball): Vec2 {.inline.} =
-  result.x = self.pos.x.toInt + self.hitbox.x
-  result.y = self.pos.y.toInt + self.hitbox.y
+  return (abs(self.center.x - holePos.x) + abs(self.center.y - holePos.y)) < 3
 
 method centerTile(self: Ball): (Pint, Pint) {.inline.} =
   let coords = self.center()
@@ -79,7 +72,7 @@ method centerTile(self: Ball): (Pint, Pint) {.inline.} =
 method tilePos(self: Ball): (Pint, Pint) {.inline.} =
   #Returns the position of the ball on current tile
   let coords = self.center()
-  result = (coords[0] mod TS, coords[1] mod TS)
+  result = ((coords.x/TS).Pint, (coords.y/TS).Pint)
 
 proc bounce(self: Ball, bounces: var seq[bncType]) =
   while bounces.len > 0:
@@ -121,8 +114,8 @@ proc turnNearHole(self: Ball) =
   if holeDist > 25:
     return
   var slopeForce: Vec2f
-  slopeForce.x = (holePos.x - self.center[0]) / holeDist^2
-  slopeForce.y = (holePos.y - self.center[1]) / holeDist^2
+  slopeForce.x = (holePos.x - self.center.x) / holeDist^2
+  slopeForce.y = (holePos.y - self.center.y) / holeDist^2
   self.vel += slopeForce
 
 proc updatePosition(self: Ball) =
@@ -219,14 +212,9 @@ proc gameUpdate(dt: float32) =
     if objDistance(currentBall(), m) < 5:
       tl.visible = true
       hideMouse()
-      tl.pos.x = center(currentBall())[0]
-      tl.pos.y = center(currentBall())[1]
-      # tl.x1 = center(currentBall())[0]
-      # tl.y1 = center(currentBall())[1]
-    tl.frc.x = m[0]
+      tl.pos = center(currentBall())
+    tl.frc.x = m[0]  # TODO: Scale
     tl.frc.y = m[1]
-    # tl.x2 = m[0]  # TODO: scale
-    # tl.y2 = m[1]
   else:
     if tl.visible == true:
       tl.visible = false
