@@ -1,173 +1,30 @@
-import os
+import sequtils
 import nico
 import nico/vec
-import strutils
-import math
 import nimigolf/consts
 import nimigolf/base
 import nimigolf/trajectory
-import nimigolf/converters
+import nimigolf/ballobj
+import nimigolf/level
 
-type
-  bncType = enum
-    bHor, bVer, bDiagSl, bDiagBSl
-
-  Ball = ref object of Obj
-    id, shots: int
-    justBounced: bool
 
 # Global vars
 
 var
   finished: bool
-  curMap, curPlayer, players, loadedLevels: int
+  curPlayer: int
   gameObjects = newSeq[Obj]()
   balls = newSeq[Ball]()
-  startPos, holePos: Vec2i
   tl = newTrajectoryLine()
 
 ## Ball
-
-proc newBall(x, y: int): Ball =
-  result = new Ball
-  result.pos.x = x - TS div 2
-  result.pos.y = y - TS div 2
-  result.hitbox.x = TS div 2
-  result.hitbox.w = 6
-  result.hitbox.y = TS div 2
-  result.hitbox.h = 6
-  result.id = players
-  result.visible = true
-  players.inc
-
-method draw(self: Ball) =
-  if self.visible:
-    spr(73+self.id, self.pos.x, self.pos.y)
-
-method reset(self: Ball) =
-  # Resets the ball position
-  self.visible = true
-  self.pos.x = startPos[0] - TS div 2
-  self.pos.y = startPos[1] - TS div 2
-  self.vel.x = 0
-  self.vel.y = 0
-
-proc getPlayer(self: Ball): string =
-  return "Player " & $(self.id + 1)
-
-proc getGameScoreCap(self: Ball): string =
-  return self.getPlayer() & ": " & $self.shots
-
-proc stop(self: Ball) =
-  self.vel.x = 0
-  self.vel.y = 0
-
-proc shouldScore(self: Ball): bool {.inline.} =
-  return (abs(self.center.x - holePos.x) + abs(self.center.y - holePos.y)) < 3
-
-method centerTile(self: Ball): (Pint, Pint) {.inline.} =
-  let coords = self.center()
-  result = pixelToMap(coords[0], coords[1])
-
-method tilePos(self: Ball): (Pint, Pint) {.inline.} =
-  #Returns the position of the ball on current tile
-  let coords = self.center()
-  result = ((coords.x/TS).Pint, (coords.y/TS).Pint)
-
-proc bounce(self: Ball, bounces: var seq[bncType]) =
-  while bounces.len > 0:
-    self.justBounced = true
-    case bounces.pop
-    of bHor:
-      self.vel.y *= -BOUNCY
-    of bVer:
-      self.vel.x *= -BOUNCY
-    of bDiagSl:
-      (self.vel.x, self.vel.y) = (self.vel.y * -BOUNCY, self.vel.x * -BOUNCY) 
-    of bDiagBSl:
-      (self.vel.x, self.vel.y) = (self.vel.y * BOUNCY, self.vel.x * BOUNCY)
-
-proc bounceIfCollision(self: Ball): bool =
-  if self.justBounced: # to be sure, not bounced twice
-    return false
-  let
-    ballTile = self.centerTile()
-    curTile = mget(ballTile[0], ballTile[1])
-    ballTilePos = self.tilePos()
-  var bounces = newSeq[bncType]()
-  if curTile in HBOUNDS:
-    bounces.add(bHor)
-  elif curTile in VBOUNDS:
-    bounces.add(bVer)
-  elif curTile in DBOUNDS:
-    bounces.add(bDiagSl)
-  elif curTile in BDBOUNDS:
-    bounces.add(bDiagBSl)
-  elif curTile in HDBOUNDS and ballTilePos[0] + ballTilePos[1] - TS < 3:
-    bounces.add(bDiagSl)
-  elif curTile in HBDBOUNDS and abs(ballTilePos[0] - ballTilePos[1]) < 3:
-    bounces.add(bDiagBSl)
-  self.bounce(bounces)
-
-proc turnNearHole(self: Ball) =
-  let holeDist = self.objDistance(holePos)
-  if holeDist > 25:
-    return
-  var slopeForce: Vec2f
-  slopeForce.x = (holePos.x - self.center.x) / holeDist^2
-  slopeForce.y = (holePos.y - self.center.y) / holeDist^2
-  self.vel += slopeForce
-
-proc updatePosition(self: Ball) =
-  self.pos.x += self.vel.x
-  self.pos.y += self.vel.y
-  self.vel.x *= DECCEL
-  self.vel.y *= DECCEL
-  if abs(self.vel.x) + abs(self.vel.y) < STOP_TH:
-    self.stop()
-  self.justBounced = self.bounceIfCollision()
-  self.turnNearHole
-
-proc isMoving(self: Ball): bool =
-  return self.vel.x != 0 or self.vel.y != 0
-
-proc shoot(self: Ball) =
-  self.vel = tl.asVel(0.2)
-  self.shots.inc
-
-proc currentBall(): Ball =
+proc currentBall(): Ball =  # TODO: cleanup
   result = balls[curPlayer]
-
-proc setObjTile(self: var Vec2i, tx, ty: Pint) =
-  # let pos = mapToPixel(tx, ty)  # TODO
-  self[0] = (tx * TS) + TS/2
-  self[1] = (ty * TS) + TS/2
 
 proc loadGfx() =
   loadFont(0, "fonts/onix.png")
   setPalette(loadPaletteFromGPL("palette/tiles.gpl"))
   loadSpritesheet(1, "tiles/Tilesheet-land-v5.png", TS, TS)
-
-proc loadMaps() =
-  for mFile in walkPattern("assets/levels/*.json"):
-    newMap(curMap, MAPW, MAPH, TS, TS)
-    loadMap(curMap, mFile.split("/", 1)[1])
-    curMap.inc
-    loadedLevels.inc
-  curMap = 0
-
-proc resetLevel() =
-  setMap(curMap)
-
-  for y in 0..<MAPH:
-    for x in 0..<MAPW:
-      case mget(x, y)
-      of 84:
-        startPos.setObjTile(x, y)
-      of 94:
-        holePos.setObjTile(x, y)
-      else:
-        discard
 
 proc resetObjects() =
   for b in balls:
@@ -218,11 +75,11 @@ proc gameUpdate(dt: float32) =
   else:
     if tl.visible == true:
       tl.visible = false
-      currentBall().shoot
+      currentBall().shoot(tl)  # TODO: min force needed to shot
       showMouse()
   for ball in balls:
     ball.updatePosition()
-    if ball.shouldScore:
+    if ball.inHole:
       ball.visible = false
   if allBallsInHole():
     curMap.inc
