@@ -1,4 +1,4 @@
-import sequtils
+import sdl2_nim/sdl
 import nico
 import nico/vec
 import nimigolf/consts
@@ -6,6 +6,7 @@ import nimigolf/base
 import nimigolf/trajectory
 import nimigolf/ballobj
 import nimigolf/level
+import nimigolf/converters
 
 
 # Global vars
@@ -17,8 +18,7 @@ var
   balls = newSeq[Ball]()
   tl = newTrajectoryLine()
 
-## Ball
-proc currentBall(): Ball =  # TODO: cleanup
+proc currentBall(): Ball {.inline.} =
   result = balls[curPlayer]
 
 proc loadGfx() =
@@ -31,16 +31,10 @@ proc resetObjects() =
     b.reset()
 
 proc createObjects() =
-  var b = newBall(startPos.x, startPos.y)
+  var b = newBall()
   gameObjects.add(tl)
   balls.add(b)
   gameObjects.add(b)
-
-proc gameInit() =
-  loadGfx()
-  loadMaps()
-  resetLevel()
-  createObjects()
 
 proc allBallsInHole(): bool =
   result = true
@@ -57,16 +51,35 @@ proc gameOver() =
     scoresOffset.inc 32
     printc(b.getGameScoreCap(), screenWidth div 2, scoresOffset)
 
+proc debugDraw() =
+  let b = currentBall()
+  setColor(0)
+  print("Debug:", 32, 32)
+  print("Ball X:" & $b.pos.x.ceil & " Y:" & $b.pos.y.ceil, 32, 48)
+  print("Tile type: " & $mget(b.centerTile[0], b.centerTile[1]), 32,64)
+  print("Tile position X:" & $b.tilePos.x & " Y:" & $b.tilePos.y, 32,80)
+
+proc gameInit() =
+  loadGfx()
+  loadMaps()
+  resetLevel()
+  createObjects()
+
 proc gameUpdate(dt: float32) =
+  if finished:
+    return
   if btnp(pcBack):
     finished = true
   if mousebtn(2):
     let m = mouse()
     debug "MOUSE: " & m.repr
     debug "HOLE: " & holePos.repr
+    currentBall().reset
+    currentBall().pos.x = m[0] - TS div 2
+    currentBall().pos.y = m[1] - TS div 2
   if mousebtn(0) and not currentBall().isMoving:
     let m = mouse()
-    if objDistance(currentBall(), m) < 5:
+    if dist(currentBall().center, m) <= 5:
       tl.visible = true
       hideMouse()
       tl.pos = center(currentBall())
@@ -78,9 +91,7 @@ proc gameUpdate(dt: float32) =
       currentBall().shoot(tl)  # TODO: min force needed to shot
       showMouse()
   for ball in balls:
-    ball.updatePosition()
-    if ball.inHole:
-      ball.visible = false
+    ball.update()
   if allBallsInHole():
     curMap.inc
     if curMap >= loadedLevels:
@@ -91,6 +102,7 @@ proc gameUpdate(dt: float32) =
     resetObjects()
 
 proc gameDraw() =
+  # delay(10)
   cls()
 
   if finished:
@@ -105,8 +117,12 @@ proc gameDraw() =
   for ob in gameObjects:
     ob.draw()
 
+  debugDraw()
+
 nico.init(orgName, appName)
 nico.createWindow(appName, SCREENW, SCREENH, 1, false)
-nico.run(gameInit, gameUpdate, gameDraw)
 
+fixedSize(true)
 integerScale(true)
+
+nico.run(gameInit, gameUpdate, gameDraw)
