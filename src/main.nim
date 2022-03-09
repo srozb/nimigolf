@@ -52,12 +52,14 @@ proc gameOver() =
     printc(b.getGameScoreCap(), screenWidth div 2, scoresOffset)
 
 proc debugDraw() =
-  let b = currentBall()
-  setColor(0)
-  print("Debug:", 32, 32)
-  print("Ball X:" & $b.pos.x.ceil & " Y:" & $b.pos.y.ceil, 32, 48)
-  print("Tile type: " & $mget(b.centerTile[0], b.centerTile[1]), 32,64)
-  print("Tile position X:" & $b.tilePos.x & " Y:" & $b.tilePos.y, 32,80)
+  when defined(debug):
+    let b = currentBall()
+    setColor(0)
+    print("Debug:", 32, 32)
+    print("Ball X:" & $b.pos.x.ceil & " Y:" & $b.pos.y.ceil, 32, 48)
+    var tileDebug = "Tile type: " & $mget(b.centerTile[0], b.centerTile[1])
+    tileDebug &= " Tile position X:" & $b.tilePos.x & " Y:" & $b.tilePos.y
+    print(tileDebug, 32,64)
 
 proc gameInit() =
   loadGfx()
@@ -102,7 +104,6 @@ proc gameUpdate(dt: float32) =
     resetObjects()
 
 proc gameDraw() =
-  # delay(10)
   cls()
 
   if finished:
