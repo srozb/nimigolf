@@ -85,8 +85,9 @@ proc gameUpdate(dt: float32) =
       tl.visible = true
       hideMouse()
       tl.pos = center(currentBall())
-    tl.frc.x = m[0]  # TODO: Scale
-    tl.frc.y = m[1]
+    # tl.frc.x = m[0]
+    # tl.frc.y = m[1]
+    tl.frc = m
   else:
     if tl.visible == true:
       tl.visible = false
