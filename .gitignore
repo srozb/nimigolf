@@ -6,7 +6,7 @@ htmldocs/
 tmp/
 dll/
 nimigolf
-nimigolf.data
-nimigolf.html
-nimigolf.js
-nimigolf.wasm
+./nimigolf.data
+./nimigolf.html
+./nimigolf.js
+./nimigolf.wasm
