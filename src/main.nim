@@ -122,9 +122,12 @@ proc gameDraw() =
   debugDraw()
 
 nico.init(orgName, appName)
-nico.createWindow(appName, SCREENW, SCREENH, 1, false)
 
 fixedSize(true)
 integerScale(true)
+
+nico.createWindow(appName, SCREENW, SCREENH, 1, false)
+
+
 
 nico.run(gameInit, gameUpdate, gameDraw)
