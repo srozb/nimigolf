@@ -5,7 +5,7 @@ nimblecache/
 htmldocs/
 tmp/
 dll/
-nimigolf
+./nimigolf
 ./nimigolf.data
 ./nimigolf.html
 ./nimigolf.js
